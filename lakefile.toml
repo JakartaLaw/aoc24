@@ -8,3 +8,8 @@ name = "Aoc"
 [[lean_exe]]
 name = "aoc"
 root = "Main"
+
+[[require]]
+name = "Regex"
+git = "https://github.com/bergmannjg/regex"
+rev = "main"
