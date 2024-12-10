@@ -103,14 +103,21 @@ def getNextXY (gs: GameState) : GameState :=
   | Direction.right => { gs with y := x + 1 }
 
 def evaluateDirection (gs: GameState) (n_directions: Nat): GameState :=
-  if n_directions == 0 then gs -- Stop if maximum direction changes are reached
+  if h01 : n_directions == 0 then gs -- Stop if maximum direction changes are reached
   else
     let gs1 := getNextXY gs
     let tile := getToken gs.x.toNat gs.y.toNat gs1
     match tile with
-    | Tile.obstackle => evaluateDirection (changeDir gs) (n_directions - 1)
+    | Tile.obstackle =>
+      have h0: n_directions - 1 < n_directions := by
+        apply Nat.sub_one_lt
+        simp [*] at h01
+        assumption
+      evaluateDirection (changeDir gs) (n_directions - 1)
     | _ => gs1
-termination_by gs n_directions => n_directions
+--termination_by n_directions
+
+#check evaluateDirection
 
 
 def move (gs: GameState) : IO Unit :=
