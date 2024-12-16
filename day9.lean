@@ -2,11 +2,29 @@ def readFile (filePath : String) : IO String := do
 let content <- IO.FS.readFile filePath
 return content
 
---computer file
+--computer file (Thanks Jonas)
+inductive MemoryType where
+| File
+| Space
+deriving Repr
+
+instance : BEq MemoryType where
+  beq mt1 mt2 :=
+    match mt1, mt2 with
+    | MemoryType.File, MemoryType.File => true
+    | MemoryType.Space, MemoryType.Space => true
+    | _, _ => false
+
+instance : ToString MemoryType where
+  toString mt :=
+    match mt with
+    | MemoryType.File => s!"File"
+    | MemoryType.Space => s!"Space"
+
 structure CompFile where
   id : Nat
   size : Nat
-  pos : Nat
+  pos : List Nat
 deriving Repr
 
 instance : ToString CompFile where
@@ -14,43 +32,56 @@ instance : ToString CompFile where
 
 structure FreeSpace where
   size : Nat
-  pos : Nat
+  pos : List Nat
 deriving Repr
 
 instance : ToString FreeSpace where
   toString fs := s!"size: {fs.size}, pos: {fs.pos}"
 
-def integizeChar (c : Char) : Option Nat :=
-  c.toString.toNat?
+def integizeChar (c : Char) : Nat :=
+  match c.toString.toNat? with -- risky business
+  | some n => n
+  | _ => 0
+  --| _ => panic! s!"This Was Not a Real Number {c}"
 
---def parseFile (content : String) : ((List CompFile) × (List FreeSpace)) :=
-def parseFile (content : String) : List CompFile :=
-  let files := content.toList.enum
-    |>.filter (fun (idx, size) => idx % 2 == 0)
-    |>.map (fun (_, size) =>
-      match integizeChar size with
-      | some n => n
-      | _ => panic! s!"Wrong character {size}"
+def parseInfo (content : String) : List (MemoryType × Nat × Nat × Nat) :=
+  content.toList.enum
+    |>.map (
+      fun (idx, size) =>
+        if idx % 2 == 0 then (MemoryType.File, integizeChar size, idx / 2)
+        else (MemoryType.Space, integizeChar size, idx)
     )
-    |>.enum.map (fun (idx, size) => CompFile.mk idx size 1)
+    |>.foldl (
+      fun acc (memtype, size, idx) =>
+      let position :=
+        match acc.get? 0 with
+        | some (_memtype, _size, _idx, _position) => _position + _size
+        | _ => 0
+      [(memtype, size, idx, position)] ++ acc
+    ) []
+    |> List.reverse
 
-  let freeSpace := content.toList.enum
-    |>.filter (fun (idx, size) => idx % 2 != 0)
-    |>.map (fun (_, size) =>
-      match integizeChar size with
-      | some n => n
-      | _ => panic! s!"Wrong character {size}"
-    )
-    |>.map (fun FreeSpace.mk size 1)
-    (files, freeSpace)
+def getCompfiles (l : List (MemoryType × Nat × Nat × Nat)) : List CompFile :=
+  l
+  |>.filter (fun (memtype, _, _, _) => memtype == MemoryType.File)
+  |>.map (fun (_, size, idx, position) => CompFile.mk idx size position)
+
+def getFreeSpace (l : List (MemoryType × Nat × Nat × Nat)) : List FreeSpace :=
+  l
+  |>.filter (fun (memtype, _, _, _) => memtype == MemoryType.Space)
+  |>.map (fun (_, size, _, position) => FreeSpace.mk size position)
+
 
 def main : IO Unit := do
   let content <- readFile "data/day9.txt"
-  let parsed := parseFile content
-  IO.println s!"{parsed}"
+  let parsed := parseInfo content
+  let compfiles := getCompfiles parsed
+  let freespaces := getFreeSpace parsed
+  IO.println s!"{compfiles}"
+  IO.println s!"{freespaces}"
 
 
 #eval main
 
 
-#eval integizeChar '2'
+--#eval integizeChar '2'
